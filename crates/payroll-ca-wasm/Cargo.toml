@@ -1,0 +1,21 @@
+[package]
+name = "payroll-ca-wasm"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.92"
+license = "Apache-2.0"
+repository = "https://github.com/wenmar-pro/payroll-ca"
+homepage = "https://wenmarpro.com"
+description = "JavaScript and WebAssembly bindings for payroll-ca: Canadian payroll source deductions by CRA T4127 Option 1"
+# The npm package is built with wasm-pack (see README); the crate itself is not published to crates.io.
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[dependencies]
+payroll-ca = { path = "../payroll-ca" }
+wasm-bindgen = "0.2"
+serde-wasm-bindgen = "0.6"
+serde_json = "1"
