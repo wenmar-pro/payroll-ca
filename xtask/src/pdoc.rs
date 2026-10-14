@@ -33,6 +33,7 @@ struct Page {
     cpp: Decimal,
     cpp2: Decimal,
     ei: Decimal,
+    cpp_exempt: bool,
     saved_on: String,
 }
 
@@ -81,7 +82,36 @@ fn amount(text: &str, label: &str, n: usize) -> Result<Decimal, String> {
         .map_err(|e| format!("{label:?}: {token:?}: {e}"))
 }
 
+/// A TD1 claim amount; PDOC prints claim code 0 as "No Claim Amount (Claim Code 0)".
+fn claim(text: &str, label: &str) -> Result<Decimal, String> {
+    let no_claim = text.lines().map(str::trim_start).any(|line| {
+        line.strip_prefix(label).is_some_and(|rest| {
+            rest.trim_start_matches(':')
+                .trim()
+                .starts_with("No Claim Amount")
+        })
+    });
+    if no_claim {
+        Ok(Decimal::ZERO)
+    } else {
+        amount(text, label, 0)
+    }
+}
+
 fn parse(text: &str) -> Result<Page, String> {
+    // A CPP-exempt result lists "CPP contributions  Exempt" and drops the pensionable
+    // earnings and CPP2 year-to-date lines.
+    let cpp_exempt = text.lines().map(str::trim).any(|line| {
+        line.strip_prefix("CPP contributions")
+            .is_some_and(|rest| rest.trim() == "Exempt")
+    });
+    let ytd = |label| {
+        if cpp_exempt {
+            Ok(Decimal::ZERO)
+        } else {
+            amount(text, label, 0)
+        }
+    };
     let periods = after(text, "Pay period frequency")?
         .split_once('(')
         .and_then(|(_, r)| r.split_whitespace().next())
@@ -99,17 +129,18 @@ fn parse(text: &str) -> Result<Page, String> {
         pay_date: first_word("Date the employee is paid")?,
         periods,
         gross: amount(text, "Salary or wages income", 0)?,
-        federal_claim: amount(text, "Federal amount from TD1", 0)?,
-        provincial_claim: amount(text, "Provincial amount from TD1", 0)?,
-        ytd_pensionable: amount(text, "Pensionable earnings", 0)?,
-        ytd_cpp: amount(text, "CPP contributions", 0)?,
-        ytd_cpp2: amount(text, "CPP2 contributions", 0)?,
+        federal_claim: claim(text, "Federal amount from TD1")?,
+        provincial_claim: claim(text, "Provincial amount from TD1")?,
+        ytd_pensionable: ytd("Pensionable earnings")?,
+        ytd_cpp: ytd("CPP contributions")?,
+        ytd_cpp2: ytd("CPP2 contributions")?,
         ytd_ei: amount(text, "EI premiums", 0)?,
         federal: amount(text, "Federal tax deduction", 0)?,
         provincial: amount(text, "Provincial tax deduction", 0)?,
         cpp: amount(text, "CPP deductions", 0)?,
         cpp2: amount(text, "CPP2 deductions", 0)?,
         ei: amount(text, "EI deductions", 0)?,
+        cpp_exempt,
         saved_on: text
             .split("Saved on")
             .nth(1)
@@ -121,8 +152,7 @@ fn parse(text: &str) -> Result<Page, String> {
 
 /// The corpus row for a result captured as `case`. PDOC prints the earnings counted this
 /// pay (0.00 once a maximum is reached); the row's pensionable and insurable are the gross.
-fn row(edition: u32, case: &str, r: &Page) -> String {
-    let exempt = CASES.iter().any(|c| c.id == case && c.cpp_exempt);
+fn row(edition: u32, r: &Page) -> String {
     [
         edition.to_string(),
         format!("{:?}", r.province),
@@ -137,7 +167,7 @@ fn row(edition: u32, case: &str, r: &Page) -> String {
         r.ytd_cpp2.to_string(),
         r.ytd_ei.to_string(),
         r.ytd_pensionable.to_string(),
-        exempt.to_string(),
+        r.cpp_exempt.to_string(),
         "false".into(),
         String::new(),
         "0.00".into(),
@@ -157,14 +187,17 @@ fn check(file: &str, province: Province, case: &str, r: &Page) -> Result<(), Str
     if r.province != province {
         return Err(format!("{file}: the PDF is for {:?}", r.province));
     }
-    let exempt = CASES.iter().any(|c| c.id == case && c.cpp_exempt);
-    if exempt && (r.cpp != Decimal::ZERO || r.cpp2 != Decimal::ZERO) {
-        return Err(format!(
-            "{file}: CPP was deducted; was CPP marked exempt in PDOC?"
-        ));
+    let want_exempt = CASES.iter().any(|c| c.id == case && c.cpp_exempt);
+    if want_exempt && !r.cpp_exempt {
+        return Err(format!("{file}: CPP was not marked exempt in PDOC"));
     }
-    let claim = r.federal_claim;
-    match case_of(r.periods, r.gross, claim, r.ytd_pensionable, exempt) {
+    match case_of(
+        r.periods,
+        r.gross,
+        r.federal_claim,
+        r.ytd_pensionable,
+        r.cpp_exempt,
+    ) {
         Some(found) if found == case => Ok(()),
         Some(found) => Err(format!("{file}: these inputs are case {found}, not {case}")),
         None => Err(format!(
@@ -217,7 +250,7 @@ pub fn import(root: &Path) -> Result<(), String> {
         match result {
             Ok(r) => {
                 println!("  {name}");
-                rows.push(row(latest.edition, case, &r));
+                rows.push(row(latest.edition, &r));
             }
             Err(e) => errors.push(e),
         }
@@ -282,7 +315,7 @@ mod tests {
         assert_eq!(r.federal, dec!(1902.96));
         check("ON-c6.pdf", Province::ON, "c6", &r).expect("is c6");
         assert_eq!(
-            row(123, "c6", &r),
+            row(123, &r),
             "123,ON,2026-07-15,12,12000.00,12000.00,12000.00,16452.00,12989.00,4179.00,0.00,1123.07,72000.00,false,false,,0.00,1902.96,1079.71,51.45,376.00,0.00,PDOC 2026-10-14,2026-10-14"
         );
     }
@@ -295,12 +328,39 @@ mod tests {
         assert!(check("ON-c8.pdf", Province::ON, "c8", &r).is_err());
     }
 
+    /// The fields that differ on a CPP-exempt, claim-code-0 result page.
+    fn variant(c6: &str) -> String {
+        c6.replace("16,452.00\n", "No Claim Amount (Claim Code 0)\n")
+            .replace(
+                " Pensionable earnings                    72,000.00            84,000.00\n",
+                "",
+            )
+            .replace(
+                " CPP contributions                        4,179.00             4,230.45 (Maximum)",
+                " CPP contributions                       Exempt",
+            )
+            .replace(
+                " CPP2 contributions                           0.00               376.00\n",
+                "",
+            )
+    }
+
+    #[test]
+    fn claim_code_0_and_cpp_exempt_pages_parse() {
+        let r = parse(&variant(C6)).expect("parses");
+        assert_eq!(r.federal_claim, Decimal::ZERO);
+        assert_eq!(r.provincial_claim, dec!(12989.00));
+        assert!(r.cpp_exempt);
+        assert_eq!(
+            (r.ytd_pensionable, r.ytd_cpp, r.ytd_cpp2),
+            (Decimal::ZERO, Decimal::ZERO, Decimal::ZERO)
+        );
+        assert!(!parse(C6).expect("parses").cpp_exempt);
+    }
+
     #[test]
     fn rows_have_every_corpus_column() {
         let r = parse(C6).expect("parses");
-        assert_eq!(
-            row(123, "c6", &r).split(',').count(),
-            HEADER.split(',').count()
-        );
+        assert_eq!(row(123, &r).split(',').count(), HEADER.split(',').count());
     }
 }
