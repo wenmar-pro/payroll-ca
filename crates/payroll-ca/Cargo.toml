@@ -1,0 +1,18 @@
+[package]
+name = "payroll-ca"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.92"
+license = "Apache-2.0"
+repository = "https://github.com/wenmar-pro/payroll-ca"
+homepage = "https://wenmarpro.com"
+description = "Canadian payroll source deductions by CRA T4127 Option 1 (regular method), excluding Quebec"
+readme = "../../README.md"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+rust_decimal = { version = "1", features = ["macros"] }
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+serde = { version = "1", features = ["derive"] }

@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/payroll-ca"]
+resolver = "2"
