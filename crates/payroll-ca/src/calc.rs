@@ -175,16 +175,19 @@ pub(crate) fn run(rates: &RateSet, pay: &Pay) -> Result<Deductions, Error> {
                 c,
                 ei,
                 max_base,
+                cpp_at_max: c + pay.ytd_cpp_base_and_first >= max_total,
+                ei_at_max: ei + pay.ytd_ei >= ei_max,
             },
         )
     };
 
-    // Step 6: T = (T1 + T2) / P + L, rounded to cents.
-    let total_tax = cents((federal_tax + provincial_tax_t2) / p + pay.additional_tax);
+    // Step 6: T = (T1 + T2) / P + L. Federal and provincial are each rounded to cents
+    // and T is their sum, as PDOC shows them (rounding the total once can differ by a cent).
+    let federal_per_pay = cents(federal_tax / p);
+    let provincial_per_pay = cents(provincial_tax_t2 / p);
+    let total_tax = federal_per_pay + provincial_per_pay + pay.additional_tax;
     f.put("L", pay.additional_tax);
     f.put("T", total_tax);
-    let federal_per_pay = cents(federal_tax / p);
-    let provincial_per_pay = total_tax - federal_per_pay;
 
     Ok(Deductions {
         federal_tax: federal_per_pay,
@@ -209,6 +212,9 @@ struct RunValues {
     ei: Decimal,
     /// The base CPP maximum prorated for PM.
     max_base: Decimal,
+    /// Whether this pay reaches (or follows) the year's CPP or EI maximum.
+    cpp_at_max: bool,
+    ei_at_max: bool,
 }
 
 /// Steps 2 to 5: returns (T1, T2), the annual federal and provincial tax deductions.
@@ -225,12 +231,24 @@ fn federal_and_provincial(
         c,
         ei,
         max_base,
+        cpp_at_max,
+        ei_at_max,
     } = v;
     let cpp = &rates.cpp;
     let ei_max = rates.ei.max_employee;
     // K2 base-CPP term: P × C × (base / total), capped at the prorated base maximum.
-    let base_cpp_annual = (p * c * (cpp.base_rate / cpp.total_rate)).min(max_base);
-    let ei_annual = (p * ei).min(ei_max);
+    // From the pay that reaches the year's maximum on, the term is the maximum itself
+    // (T4127 Chapter 4 note after F5, followed by PDOC); likewise P × EI.
+    let base_cpp_annual = if cpp_at_max {
+        max_base
+    } else {
+        (p * c * (cpp.base_rate / cpp.total_rate)).min(max_base)
+    };
+    let ei_annual = if ei_at_max {
+        ei_max
+    } else {
+        (p * ei).min(ei_max)
+    };
     let gross_annual = p * pay.gross_taxable;
 
     // Step 2: federal T3.
