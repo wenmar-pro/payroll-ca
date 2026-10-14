@@ -157,18 +157,22 @@ impl RateSet {
     }
 }
 
+/// Every edition the crate holds, oldest first.
+pub fn editions() -> &'static [RateSet] {
+    static ALL: OnceLock<Vec<RateSet>> = OnceLock::new();
+    ALL.get_or_init(|| vec![ed123::rate_set()])
+}
+
 /// The rate set in force on `date`. Errors (never falls back) when no edition covers it.
 pub fn rate_set_for(date: NaiveDate) -> Result<&'static RateSet, Error> {
-    static ED123: OnceLock<RateSet> = OnceLock::new();
-    let set = ED123.get_or_init(ed123::rate_set);
-    if date < set.effective || date > set.valid_until {
-        return Err(Error::DateOutOfRange {
+    let all = editions();
+    all.iter()
+        .find(|set| set.effective <= date && date <= set.valid_until)
+        .ok_or(Error::DateOutOfRange {
             date,
-            effective: set.effective,
-            valid_until: set.valid_until,
-        });
-    }
-    Ok(set)
+            effective: all[0].effective,
+            valid_until: all[all.len() - 1].valid_until,
+        })
 }
 
 /// Federal basic personal amount formula (BPAF) at net income `ni` (A + HD), for use

@@ -1,0 +1,11 @@
+[package]
+name = "xtask"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.92"
+publish = false
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+payroll-ca = { path = "../crates/payroll-ca" }
+rust_decimal = { version = "1", features = ["macros"] }
