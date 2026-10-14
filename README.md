@@ -14,6 +14,47 @@ The crate is a Rust library. It does no I/O. It computes, for one pay:
 
 Every named T4127 factor used in a calculation is returned, so a result can be explained.
 
+## JavaScript / npm
+
+The `payroll-ca-wasm` crate builds the same calculation to WebAssembly for browsers and
+Node bundlers. The npm package is `@wenmar/payroll-ca`.
+
+```js
+import { calculate, edition } from "@wenmar/payroll-ca";
+
+const deductions = calculate({
+  pay_date: "2026-07-15",          // YYYY-MM-DD; selects the rate set
+  province: "ON",                  // two-letter code; "QC" throws
+  periods_per_year: 26,            // P
+  gross_taxable: "2400.00",        // I; decimals are strings
+  pensionable: "2400.00",          // PI
+  insurable: "2400.00",            // IE
+  federal_claim: "16452.00",       // TC from TD1 (or the claim code amount)
+  provincial_claim: "12989.00",    // TCP from the provincial TD1
+  ytd_cpp_base_and_first: "0.00",  // D: CPP base and first additional earlier this year
+  ytd_cpp2: "0.00",                // D2: second additional CPP earlier this year
+  ytd_ei: "0.00",                  // D1: EI earlier this year
+  ytd_pensionable: "0.00",         // PIYTD: pensionable earnings earlier this year
+  cpp_exempt: false,
+  ei_exempt: false,
+  birth_date: null,                // "YYYY-MM-DD" or null (CPP applies all year)
+  additional_tax: "0.00",          // L: additional tax per pay from TD1
+});
+
+deductions.federal_tax;   // decimal string
+deductions.cpp;           // employee CPP (base and first additional), decimal string
+deductions.factors;       // [[name, value], ...]: every named T4127 factor used
+
+edition();                // "123 (2026-07-01 to 2026-12-31)"
+```
+
+`calculate` throws an `Error` whose message says why: an unknown province, Quebec, invalid
+input, or a pay date outside the edition. Input field names are exactly the snake_case names
+above. Output fields are `federal_tax`, `provincial_tax`, `total_tax`, `cpp`, `cpp2`, `ei`,
+`employer_cpp`, `employer_cpp2`, `employer_ei` (all decimal strings) and `factors`.
+
+The same JSON shape is what the Rust `Pay` and `Deductions` types serialize to.
+
 ## Scope and limits
 
 - **Option 1 only.** Option 2 (cumulative averaging) and the commission and bonus
@@ -82,8 +123,30 @@ cargo fmt --all --check
 - `tests/properties.rs` holds deterministic sweeps: CPP, CPP2 and EI stop at their maxima,
   tax is never negative, Quebec and unknown provinces are errors, dates outside the edition
   are errors, and the age window for CPP is applied.
+- `tests/json.rs` checks that `Pay` round-trips through JSON, with snake_case fields,
+  decimal strings and two-letter province codes.
 - `tests/cases.rs` loads every `cases/*.csv` file and checks each row. The format is in
   `cases/README.md`. The shared corpus is empty for now.
+
+## Releasing (maintainers)
+
+Releases are made by hand. CI never publishes and holds no registry credentials.
+
+```sh
+# crates.io (payroll-ca only; payroll-ca-wasm is publish = false)
+cargo publish -p payroll-ca
+
+# npm: build the package, set its name, then publish it
+wasm-pack build crates/payroll-ca-wasm --target bundler --scope wenmar --release
+#   wasm-pack names the package @wenmar/payroll-ca-wasm (from the crate name). Rename it
+#   to the published name before publishing:
+node -e 'const f="crates/payroll-ca-wasm/pkg/package.json";const p=require("./"+f);p.name="@wenmar/payroll-ca";require("fs").writeFileSync(f,JSON.stringify(p,null,2)+"\n")'
+wasm-pack publish crates/payroll-ca-wasm/pkg --access public
+```
+
+Check that `crates/payroll-ca-wasm/pkg/package.json` names `@wenmar/payroll-ca` and that
+`edition()` returns the edition you intend before publishing. Bump `version` in both crates
+first. The `pkg/` directory is gitignored.
 
 ## Maintenance
 
