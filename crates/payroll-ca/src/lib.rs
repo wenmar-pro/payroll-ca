@@ -56,7 +56,9 @@ impl Province {
 
 /// One pay, with the year-to-date figures T4127 needs. Year-to-date values exclude
 /// this pay. All amounts are dollars and must not be negative.
-#[derive(Debug, Clone, PartialEq)]
+///
+/// JSON uses snake_case field names; decimals are strings (`"2400.00"`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Pay {
     /// Pay date; selects the rate set and the calendar year for CPP months.
     pub pay_date: NaiveDate,
@@ -96,7 +98,7 @@ pub struct Pay {
 /// The deductions for one pay. `cpp` is the employee's base plus first additional CPP
 /// (C in T4127); `cpp2` is the second additional (C2). `provincial_tax` is the remainder
 /// of `total_tax` after `federal_tax`, so the two always add up to `total_tax`.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Deductions {
     pub federal_tax: Decimal,
     pub provincial_tax: Decimal,
