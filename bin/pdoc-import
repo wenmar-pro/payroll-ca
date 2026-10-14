@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Writes a corpus row for each new PDF in reference/pdoc/<edition>/, then checks the engine
+# against every case. Needs pdftotext (poppler).
+# Usage: bin/pdoc-import
+set -euo pipefail
+cd "$(dirname "$0")/.."
+cargo xtask pdoc-import
+echo
+echo "Checking the engine against cases/ ..."
+if out=$(cargo test -q -p payroll-ca --test cases 2>&1); then
+  echo "All cases match."
+else
+  grep -E "got .*expected" <<<"$out" || echo "$out"
+  echo "Some cases differ from the engine (above)."
+  exit 1
+fi

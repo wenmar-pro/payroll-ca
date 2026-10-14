@@ -11,6 +11,8 @@ use payroll_ca::Province;
 use payroll_ca::rates::{RateSet, editions};
 use rust_decimal::{Decimal, dec};
 
+mod pdoc;
+
 /// Provinces captured in PDOC, in capture order.
 const PROVINCES: [Province; 4] = [Province::ON, Province::BC, Province::AB, Province::NS];
 
@@ -141,7 +143,7 @@ const fn case(
 }
 
 /// The case a corpus row was captured for, from its inputs.
-fn case_of(
+pub(crate) fn case_of(
     periods: u32,
     gross: Decimal,
     claim: Decimal,
@@ -159,13 +161,13 @@ fn case_of(
 }
 
 /// One captured row of `cases/pdoc-*.csv`.
-struct Captured {
+pub(crate) struct Captured {
     edition: u32,
     province: Province,
     case: &'static str,
 }
 
-fn read_corpus(root: &Path) -> Result<Vec<Captured>, String> {
+pub(crate) fn read_corpus(root: &Path) -> Result<Vec<Captured>, String> {
     let mut rows = Vec::new();
     let dir = root.join("cases");
     let entries = fs::read_dir(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
@@ -343,7 +345,7 @@ fn ytd_inputs(ytd: Ytd, rates: &RateSet) -> Vec<(&'static str, String)> {
     ]
 }
 
-fn pdoc_due(root: &Path) -> Result<(), String> {
+fn pdoc_due(root: &Path, provinces: &[Province]) -> Result<(), String> {
     let all = editions();
     let latest = &all[all.len() - 1];
     let captured = read_corpus(root)?;
@@ -362,7 +364,7 @@ fn pdoc_due(root: &Path) -> Result<(), String> {
 
     let mut due: Vec<(Province, &Case)> = Vec::new();
     let mut transcribe = 0;
-    for province in PROVINCES {
+    for &province in provinces {
         print!("  {province:?} ");
         for c in &CASES {
             let pdf = pdf_dir.join(format!("{province:?}-{}.pdf", c.id)).is_file();
@@ -443,13 +445,35 @@ fn pdoc_due(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Provinces named on the command line, or all of `PROVINCES`.
+fn provinces_from(args: &[String]) -> Result<Vec<Province>, String> {
+    if args.is_empty() {
+        return Ok(PROVINCES.to_vec());
+    }
+    args.iter()
+        .map(|a| {
+            let p = Province::parse(a).map_err(|e| e.to_string())?;
+            if PROVINCES.contains(&p) {
+                Ok(p)
+            } else {
+                Err(format!(
+                    "{p:?} is not in the PDOC case list ({PROVINCES:?})"
+                ))
+            }
+        })
+        .collect()
+}
+
+const USAGE: &str = "usage: cargo xtask pdoc-due [PROVINCE...] | pdoc-import";
+
 fn main() -> ExitCode {
     let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
     let root = manifest.parent().unwrap_or(manifest);
-    let task = std::env::args().nth(1);
-    let result = match task.as_deref() {
-        Some("pdoc-due") => pdoc_due(root),
-        _ => Err("usage: cargo xtask pdoc-due".into()),
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let result = match args.first().map(String::as_str) {
+        Some("pdoc-due") => provinces_from(&args[1..]).and_then(|p| pdoc_due(root, &p)),
+        Some("pdoc-import") => pdoc::import(root),
+        _ => Err(USAGE.into()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

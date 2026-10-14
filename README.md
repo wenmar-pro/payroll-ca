@@ -151,11 +151,16 @@ first. The `pkg/` directory is gitignored.
 ## Maintenance
 
 Each new T4127 edition (January and July) gets PDOC reference captures, taken by hand in
-CRA's calculator (it refuses scripted requests). `cargo xtask pdoc-due` lists the captures the
+CRA's calculator (it refuses scripted requests). `bin/pdoc-due` lists the captures the
 newest edition still needs and the inputs to type for each: a case whose rate tables did not
 change since its last capture is not captured again. It compares rate tables only; an edition
-that changes a formula in the T4127 text needs every case captured again. PDFs go in
-`reference/pdoc/<edition>/` (not committed), rows in `cases/pdoc-<edition>.csv`.
+that changes a formula in the T4127 text needs every case captured again.
+
+    bin/pdoc-due [PROVINCE...]   # what to capture, e.g. bin/pdoc-due ON
+    bin/pdoc-import              # PDFs -> cases/pdoc-<edition>.csv, then the case test
+
+PDFs go in `reference/pdoc/<edition>/<province>-<case>.pdf` (not committed). `pdoc-import`
+needs `pdftotext` (poppler) and refuses a PDF whose inputs are not the case its name says.
 
 Maintained by Wenmar, <https://wenmarpro.com>. Licensed under the Apache License 2.0
 (see `LICENSE`).
