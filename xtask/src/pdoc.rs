@@ -8,7 +8,7 @@ use std::process::Command;
 
 use payroll_ca::Province;
 use payroll_ca::rates::editions;
-use rust_decimal::Decimal;
+use rust_decimal::{Decimal, dec};
 
 use crate::{CASES, case_of, read_corpus};
 
@@ -92,7 +92,7 @@ fn claim(text: &str, label: &str) -> Result<Decimal, String> {
         })
     });
     if no_claim {
-        Ok(Decimal::ZERO)
+        Ok(dec!(0.00))
     } else {
         amount(text, label, 0)
     }
@@ -107,7 +107,7 @@ fn parse(text: &str) -> Result<Page, String> {
     });
     let ytd = |label| {
         if cpp_exempt {
-            Ok(Decimal::ZERO)
+            Ok(dec!(0.00))
         } else {
             amount(text, label, 0)
         }
@@ -278,7 +278,6 @@ pub fn import(root: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rust_decimal::dec;
 
     /// The layout `pdftotext -layout` gives for a PDOC salary result (ZZ test inputs).
     const C6: &str = "
