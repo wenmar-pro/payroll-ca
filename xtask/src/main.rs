@@ -12,6 +12,7 @@ use payroll_ca::rates::{RateSet, editions};
 use rust_decimal::{Decimal, dec};
 
 mod pdoc;
+mod t4032;
 
 /// Provinces captured in PDOC, in capture order.
 const PROVINCES: [Province; 4] = [Province::ON, Province::BC, Province::AB, Province::NS];
@@ -464,7 +465,7 @@ fn provinces_from(args: &[String]) -> Result<Vec<Province>, String> {
         .collect()
 }
 
-const USAGE: &str = "usage: cargo xtask pdoc-due [PROVINCE...] | pdoc-import";
+const USAGE: &str = "usage: cargo xtask pdoc-due [PROVINCE...] | pdoc-import | t4032-import <pdf-dir> <province> <out.csv>";
 
 fn main() -> ExitCode {
     let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -473,6 +474,7 @@ fn main() -> ExitCode {
     let result = match args.first().map(String::as_str) {
         Some("pdoc-due") => provinces_from(&args[1..]).and_then(|p| pdoc_due(root, &p)),
         Some("pdoc-import") => pdoc::import(root),
+        Some("t4032-import") => t4032::import(root, &args[1..]),
         _ => Err(USAGE.into()),
     };
     match result {
