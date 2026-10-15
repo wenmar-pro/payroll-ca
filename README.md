@@ -70,7 +70,27 @@ The same JSON shape is what the Rust `Pay` and `Deductions` types serialize to.
 - **Results are not guaranteed.** The formulas are approved by CRA, but the calculation is
   this crate's implementation of them. The employer remains liable to CRA for the amounts it
   deducts and remits. Check results against CRA's Payroll Deductions Online Calculator
-  before relying on them.
+  before relying on them (see [Check a result yourself](#check-a-result-yourself)).
+
+## Check a result yourself
+
+CRA's own [Payroll Deductions Online Calculator (PDOC)](https://www.canada.ca/en/revenue-agency/services/e-services/digital-services-businesses/payroll-deductions-online-calculator.html)
+gives the same figures for the same pay. To compare one result:
+
+1. Open PDOC, accept the terms and choose **Salary**.
+2. Enter the province, the pay period frequency, the date paid and the gross salary for the
+   period, with nothing else in the income fields.
+3. Enter the claim amounts you passed as `federal_claim` and `provincial_claim` (claim code 1 is
+   the basic personal amount), and any year-to-date CPP, CPP2, EI and pensionable earnings.
+   Leave a zero year-to-date field blank: PDOC refuses 0.
+4. Compare PDOC's federal tax, provincial tax, CPP, CPP2 and EI with `Deductions`. They agree to
+   the cent.
+
+The cases already compared are in [`cases/pdoc-123.csv`](cases/pdoc-123.csv): each row is the
+inputs typed into PDOC and the deductions it returned, with the date captured. The crate's tests
+check every row (`cargo test --test cases`). How they were captured: [`cases/README.md`](cases/README.md).
+CRA's formulas themselves are the T4127 publication,
+[Payroll Deductions Formulas](https://www.canada.ca/en/revenue-agency/services/forms-publications/payroll/t4127-payroll-deductions-formulas.html).
 
 ## Usage
 
