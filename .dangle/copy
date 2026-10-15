@@ -1,0 +1,7 @@
+# Paths copied from the main checkout into every new worktree (before the setup hook).
+# Copies are copy-on-write where the disk allows. 'link <path>' makes a symlink instead.
+# Use this for files git does not track: .env, node_modules, a warm build directory.
+# A warm build directory (copy-on-write on btrfs, xfs and APFS; a full copy elsewhere).
+target
+# The CRA reference files (gitignored); the xtask importers read them.
+link reference

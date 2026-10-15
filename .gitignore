@@ -1,3 +1,4 @@
 /reference/
 /target/
 /crates/payroll-ca-wasm/pkg/
+/.worktrees/

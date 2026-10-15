@@ -1,0 +1,5 @@
+#!/bin/sh
+# Runs in a new worktree, after .dangle/copy. A failure stops the plan.
+# $DANGLE_PRIMARY is the main checkout, $DANGLE_WORKTREE this worktree, $DANGLE_BRANCH its branch.
+set -e
+

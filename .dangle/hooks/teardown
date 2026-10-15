@@ -1,0 +1,3 @@
+#!/bin/sh
+# Runs in a worktree just before it is removed (after a landing or `dangle rm`).
+# Save anything worth keeping, e.g. a build cache for the next worktree.

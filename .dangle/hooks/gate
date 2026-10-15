@@ -1,0 +1,9 @@
+#!/bin/sh
+# The gate: runs in the worktree before a landing. Exit 0 and the work lands; anything
+# else and it does not. Make it the checks you trust: format, lint, tests, build.
+set -e
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+# As CI does.
+cargo build -p payroll-ca-wasm --target wasm32-unknown-unknown --release

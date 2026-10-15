@@ -1,0 +1,22 @@
+# dangle settings: KEY=value, one per line. Read, never run.
+BASE=main
+PLANS=docs/superpowers/plans
+# Landed plans move here, inside PLANS.
+DONE=done
+# The agent: claude (Claude Code, the default), codex, opencode or pi, with an optional
+# :model (claude:sonnet, codex:gpt-5, pi:ollama/qwen3), or a command of your own that takes
+# the prompt last.
+# Unset here: each person's own default applies (~/.config/dangle/config, else claude).
+# AGENT=claude
+# FIX_AGENT=claude:sonnet
+# Fix-up runs after a failed gate (0 = none).
+FIXES=1
+AGENT_TIMEOUT=4h
+GATE_TIMEOUT=60m
+# Short names for -a:  dangle -a cheap
+# ALIAS_cheap=claude:haiku
+# REMOTE=origin   (none = never fetch or push)
+# WORKTREES=.worktrees
+# BRANCH_PREFIX=plan-
+# Plans carry complete code and tests: aim for 400 to 800 lines.
+MAX_LINES=1000
