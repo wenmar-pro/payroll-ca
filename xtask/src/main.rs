@@ -39,7 +39,7 @@ struct Case {
 }
 
 /// The fixed case list of manual plan M28.
-const CASES: [Case; 9] = [
+const CASES: [Case; 10] = [
     case(
         "c1",
         "Weekly (52)",
@@ -120,6 +120,15 @@ const CASES: [Case; 9] = [
         Ytd::None,
         false,
         true,
+    ),
+    case(
+        "c10",
+        "Monthly (12)",
+        12,
+        dec!(5000.00),
+        Ytd::None,
+        false,
+        false,
     ),
 ];
 
@@ -596,6 +605,7 @@ mod tests {
             Some("c7")
         );
         assert_eq!(case_of(26, dec!(2400.00), claim, zero, true), Some("c8"));
+        assert_eq!(case_of(12, dec!(5000.00), claim, zero, false), Some("c10"));
         assert_eq!(
             case_of(12, dec!(12000.00), claim, dec!(72000), false),
             Some("c6")
